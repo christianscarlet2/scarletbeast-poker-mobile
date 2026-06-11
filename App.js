@@ -22,6 +22,11 @@ const APP_HOST = 'poker.scarletbeast.com';
 const BRAND_BG = '#0b0b0f';
 const BRAND_RED = '#c1121f';
 
+// Tells the site it's running inside the native app so it renders tables in a
+// bare, full-screen view (no shared chrome). `windows:false` → no OS windows on
+// a phone, so the site swaps in-place instead of popping a new one.
+const INJECT_APP_FLAG = `window.scarletbeastApp = { isApp: true, platform: ${JSON.stringify(Platform.OS)}, windows: false }; true;`;
+
 function isInternal(url) {
   try {
     return new URL(url).host === APP_HOST;
@@ -98,6 +103,7 @@ export default function App() {
             ref={webRef}
             source={{ uri: APP_URL }}
             originWhitelist={['https://*']}
+            injectedJavaScriptBeforeContentLoaded={INJECT_APP_FLAG}
             onShouldStartLoadWithRequest={onShouldStartLoad}
             onNavigationStateChange={(nav) => {
               canGoBack.current = nav.canGoBack;
@@ -106,6 +112,14 @@ export default function App() {
             onLoadEnd={() => {
               setLoading(false);
               setRefreshing(false);
+            }}
+            // onLoadEnd isn't always fired for JS-initiated (location.assign)
+            // navigations, so also clear the overlay once the page is fully loaded.
+            onLoadProgress={({ nativeEvent }) => {
+              if (nativeEvent.progress >= 1) {
+                setLoading(false);
+                setRefreshing(false);
+              }
             }}
             onError={() => {
               setLoading(false);
@@ -116,7 +130,6 @@ export default function App() {
             }}
             pullToRefreshEnabled
             allowsBackForwardNavigationGestures
-            startInLoadingState
             decelerationRate={0.998}
             style={styles.web}
             containerStyle={styles.webContainer}
